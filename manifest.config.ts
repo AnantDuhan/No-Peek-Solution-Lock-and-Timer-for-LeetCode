@@ -5,16 +5,14 @@ const manifest: ManifestV3Export = {
 
   name: "No Peek: Solution Lock & Timer for LeetCode",
 
-  version: "1.4.1",
+  version: "1.4.2",
 
   description:
     "Hide previous solutions and improve problem-solving discipline.",
 
   permissions: [
-    // settings and per-problem start times
-    "storage",
-    // run the code reset in the page's own JS world, where the editor lives
-    "scripting"
+    // settings, per-problem timers and practice history
+    "storage"
   ],
 
   host_permissions: [
@@ -49,6 +47,22 @@ const manifest: ManifestV3Export = {
       js: [
         "src/content/content.ts"
       ],
+
+      run_at: "document_idle"
+    },
+    {
+      // Resets the code editor, which only exists in the page's own
+      // JavaScript world. Declaring it here with world: "MAIN" avoids the
+      // "scripting" permission. It does nothing until content.ts asks.
+      matches: [
+        "https://leetcode.com/*"
+      ],
+
+      js: [
+        "src/page/editorBridge.ts"
+      ],
+
+      world: "MAIN",
 
       run_at: "document_idle"
     }

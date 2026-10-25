@@ -106,14 +106,16 @@ src/
   shared/        timer math, re-solve rules, stats, messages, donation links
   popup/         settings and live timer (React + Tailwind)
   background/
-    background.ts   toolbar badge, runs the code reset
-    resetEditor.ts  code reset, runs inside LeetCode's page
+    background.ts   toolbar badge, re-solve count, opens the dashboard
+  page/             runs in LeetCode's own JS world (manifest world: "MAIN")
+    editorBridge.ts receives reset requests from content.ts via window events
+    resetEditor.ts  code reset; must bundle with no imports (see shared/bridge.ts)
 assets/          icon sources (SVG)
 scripts/         icon renderer
 manifest.config.ts
 ```
 
-If a LeetCode redesign breaks the locking, `src/content/route.ts` is the only file that should need changes. If it breaks the code reset, see `src/background/resetEditor.ts`.
+If a LeetCode redesign breaks the locking, `src/content/route.ts` is the only file that should need changes. If it breaks the code reset, see `src/page/resetEditor.ts`.
 
 ## Icon
 
@@ -126,9 +128,10 @@ node scripts/render-icons.mjs
 
 ## Permissions
 
-- `storage`: saves your settings and per-problem start times.
-- `scripting`: runs the code reset inside the LeetCode page, where the code editor lives.
-- Host access to `leetcode.com`: the content script runs there and nowhere else.
+- `storage`: saves your settings, per-problem timers and practice history.
+- Host access to `leetcode.com`: the content scripts run there and nowhere else.
+
+That's all. The code reset runs in the page through a content script declared with `world: "MAIN"`, which needs no extra permission. Because the extension can't inject into tabs that were already open, reload open LeetCode tabs after installing or updating.
 
 Settings sync through your Chrome account like any extension's synced settings. Your practice history stays in this browser (export it from the dashboard to back it up). Nothing is sent anywhere else.
 

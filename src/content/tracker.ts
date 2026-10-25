@@ -1,10 +1,9 @@
-import type { ExtensionMessage, GraphqlResult } from "../shared/messages";
 import type { ProblemMeta } from "../storage/history";
 
 /**
  * Reads problem details and your recent submissions from LeetCode's GraphQL
- * API. Queries run inside the page via the background worker, so they use
- * your LeetCode session exactly like the site does.
+ * API. The content script runs on leetcode.com, so these are same-origin
+ * requests that carry your LeetCode session exactly like the site's own.
  *
  * Verified against leetcode.com in October 2026:
  * - question(titleSlug) returns questionFrontendId, title, difficulty, topicTags.
@@ -13,8 +12,6 @@ import type { ProblemMeta } from "../storage/history";
  *   timestamp in seconds. It works for old submissions, unlike
  *   /submissions/detail/<id>/check/, which only answers for fresh ones.
  */
-
-export type Send = (message: ExtensionMessage) => Promise<unknown>;
 
 const META_QUERY =
   "query blindPracticeMeta($titleSlug: String!) {" +
@@ -29,13 +26,26 @@ const SUBMISSIONS_QUERY =
 const CLOCK_SKEW_MS = 30_000;
 const NOT_JUDGED = /pending|judging/i;
 
-async function graphql(send: Send, query: string, variables: Record<string, unknown>): Promise<unknown | null> {
-  const result = (await send({ type: "graphql", query, variables })) as GraphqlResult | undefined;
-  return result?.ok ? result.data : null;
+/** Runs a query; null on any network, HTTP or GraphQL error. */
+async function graphql(query: string, variables: Record<string, unknown>): Promise<unknown | null> {
+  try {
+    const response = await fetch(`${location.origin}/graphql/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ query, variables }),
+    });
+    if (!response.ok) return null;
+    const json = await response.json();
+    if (json?.errors?.length) return null;
+    return json?.data ?? null;
+  } catch {
+    return null;
+  }
 }
 
-export async function fetchMeta(send: Send, slug: string): Promise<ProblemMeta | null> {
-  const data = (await graphql(send, META_QUERY, { titleSlug: slug })) as {
+export async function fetchMeta(slug: string): Promise<ProblemMeta | null> {
+  const data = (await graphql(META_QUERY, { titleSlug: slug })) as {
     question?: { questionFrontendId?: string; title?: string; difficulty?: string; topicTags?: { name: string }[] } | null;
   } | null;
   const q = data?.question;
@@ -72,8 +82,8 @@ export function analyzeSubmissions(submissions: RawSubmission[], sinceMs: number
   return { accepted: firstAccepted ? { id: firstAccepted.id, at: firstAccepted.at } : null, wrong };
 }
 
-export async function scanSubmissions(send: Send, slug: string, sinceMs: number): Promise<SubmissionScan | null> {
-  const data = (await graphql(send, SUBMISSIONS_QUERY, { questionSlug: slug, offset: 0, limit: 20 })) as {
+export async function scanSubmissions(slug: string, sinceMs: number): Promise<SubmissionScan | null> {
+  const data = (await graphql(SUBMISSIONS_QUERY, { questionSlug: slug, offset: 0, limit: 20 })) as {
     questionSubmissionList?: { submissions?: RawSubmission[] } | null;
   } | null;
   const submissions = data?.questionSubmissionList?.submissions;

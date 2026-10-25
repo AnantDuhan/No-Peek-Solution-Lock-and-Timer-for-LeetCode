@@ -1,10 +1,9 @@
 /** Messages from the content script or popup to the background service worker. */
 export type ExtensionMessage =
   | { type: "badge"; text: string; state: "locked" | "paused" | "unlocked" }
-  /** Without force, existing non-template code is left alone (see resetEditorToDefault). */
-  | { type: "reset-code"; slug: string; force?: boolean }
-  | { type: "graphql"; query: string; variables: Record<string, unknown> }
   | { type: "open-dashboard"; hash?: string };
+
+/** Result of resetEditorToDefault, sent back over the page bridge (see shared/bridge.ts). */
 
 export interface ResetCodeResult {
   ok: boolean;
@@ -15,10 +14,4 @@ export interface ResetCodeResult {
   existingCode?: boolean;
   /** How many saved drafts in other languages were removed. */
   removedDrafts?: number;
-}
-
-export interface GraphqlResult {
-  ok: boolean;
-  data?: unknown;
-  error?: string;
 }

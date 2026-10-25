@@ -23,6 +23,7 @@ import {
   setFlag,
   type ProblemRecord,
 } from "../storage/history";
+import type { ResetRequestEvent, ResetResponse, ResetResultEvent } from "../shared/bridge";
 import type { ExtensionMessage, ResetCodeResult } from "../shared/messages";
 import { isDue, relativeDays } from "../shared/review";
 import { lastSolved } from "../shared/stats";
@@ -95,9 +96,9 @@ const THANK_YOU_AFTER = 10;
  * Lifecycle. When the extension is reloaded, updated or removed, this script
  * keeps running in open tabs but every chrome.* call throws "Extension context
  * invalidated". So: check before acting, catch async failures, and shut down
- * cleanly (UI removed, timers and listeners gone). The background worker
- * injects a fresh copy into open LeetCode tabs after an install or update, and
- * a newer copy announces itself so this one steps aside.
+ * cleanly (UI removed, timers and listeners gone). Open LeetCode tabs get the
+ * new version when they're reloaded; a newer copy announces itself so this one
+ * steps aside.
  */
 const INSTANCE = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 let stopped = false;
@@ -333,7 +334,7 @@ function watchForAccepted(durationMs = WATCH_DURATION_MS): void {
       watch = null;
       return;
     }
-    const scan = await scanSubmissions(sendMessage, slug, current.attemptId);
+    const scan = await scanSubmissions(slug, current.attemptId);
     if (scan?.accepted) {
       watch = null;
       await handleSolved(slug, scan.wrong);
@@ -411,7 +412,7 @@ async function handleStart(): Promise<void> {
   if (created) {
     bg(beginAttempt(slug, started.attemptId, wasDue));
     if (!problemRecord?.meta) {
-      bg(fetchMeta(sendMessage, slug).then((meta) => meta && saveMeta(slug, meta)));
+      bg(fetchMeta(slug).then((meta) => meta && saveMeta(slug, meta)));
     }
   }
 
@@ -427,17 +428,50 @@ async function handleStart(): Promise<void> {
  */
 async function resetCode(slug: string, force: boolean): Promise<void> {
   showNotice("↺ Resetting code to the default template…", 20_000);
-  const result = (await sendMessage({ type: "reset-code", slug, force })) as ResetCodeResult | undefined;
+  const result = await requestReset(slug, force);
   if (route?.slug !== slug) return;
-  if (result?.existingCode) {
+  if (result.existingCode) {
     notice = null;
     codeChoice = { slug, busy: false };
     render();
     return;
   }
   codeChoice = null;
-  if (result?.ok) showNotice("↺ Code reset to the default template", 3000);
-  else showNotice(`⚠️ Couldn't reset code: ${result?.reason ?? "no response"}`, 8000);
+  if (result.ok) showNotice("↺ Code reset to the default template", 3000);
+  else showNotice(`⚠️ Couldn't reset code: ${result.reason ?? "no response"}`, 8000);
+}
+
+const RESET_REQUEST_EVENT: ResetRequestEvent = "no-peek:reset-request";
+const RESET_RESULT_EVENT: ResetResultEvent = "no-peek:reset-result";
+
+/** Longest a reset can take: waiting for the editor, the draft check and the save. */
+const RESET_TIMEOUT_MS = 45_000;
+
+/**
+ * Asks the page-world bridge (page/editorBridge.ts) to reset the editor. The
+ * editor only exists in the page's own JavaScript world, which this isolated
+ * content script can reach only through window events.
+ */
+function requestReset(slug: string, force: boolean): Promise<ResetCodeResult> {
+  const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return new Promise((resolve) => {
+    const finish = (result: ResetCodeResult) => {
+      window.removeEventListener(RESET_RESULT_EVENT, onResult);
+      clearTimeout(timeout);
+      resolve(result);
+    };
+    const onResult = (event: Event) => {
+      try {
+        const response = JSON.parse(String((event as CustomEvent).detail)) as ResetResponse;
+        if (response?.id === id && response.result) finish(response.result);
+      } catch {
+        // Not ours.
+      }
+    };
+    const timeout = setTimeout(() => finish({ ok: false, reason: "The editor didn't respond." }), RESET_TIMEOUT_MS);
+    window.addEventListener(RESET_RESULT_EVENT, onResult);
+    window.dispatchEvent(new CustomEvent(RESET_REQUEST_EVENT, { detail: JSON.stringify({ id, slug, force }) }));
+  });
 }
 
 async function handleStartFresh(): Promise<void> {

@@ -10,10 +10,9 @@ import type { ResetCodeResult } from "../shared/messages";
  * solution: the two can't be told apart), it changes nothing and returns
  * `existingCode: true` so the user can choose. With `force`, it always resets.
  *
- * Runs in the PAGE's JavaScript world (chrome.scripting, world: "MAIN"),
- * because the Monaco editor object isn't visible to content scripts. The
- * function is serialized, so it must be self-contained: no imports, no
- * references to anything outside its own body.
+ * Runs in the PAGE's JavaScript world (editorBridge.ts, a manifest content
+ * script with world: "MAIN"), because the Monaco editor object isn't visible
+ * to isolated content scripts.
  *
  * Verified against leetcode.com in October 2026:
  * - Default code comes from the public GraphQL `question.codeSnippets`.
