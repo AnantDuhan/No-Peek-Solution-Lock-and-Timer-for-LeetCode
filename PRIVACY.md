@@ -1,8 +1,16 @@
 # Privacy Policy: No Peek: Solution Lock & Timer for LeetCode
 
-Last updated: 24 October 2026
+Last updated: 25 October 2026
 
-No Peek does not collect, sell or share any personal data. The developer receives nothing from the extension.
+No Peek handles some data to work, and all of it stays in your browser. Nothing is sent to the developer or to any third party, and nothing is sold or shared. The only requests the extension makes go to LeetCode itself.
+
+In the Chrome Web Store's terms, the extension handles:
+
+- **Web history:** which LeetCode problems you attempt, and when.
+- **User activity:** whether you opened a solution section before solving, and how many submissions were rejected before Accepted.
+- **Website content:** problem titles, difficulty, topic tags and default code templates read from LeetCode.
+
+It handles no personally identifiable, health, financial, authentication, communication or location data.
 
 ## What the extension stores
 

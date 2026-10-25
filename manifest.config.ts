@@ -8,7 +8,7 @@ const manifest: ManifestV3Export = {
   version: "1.4.2",
 
   description:
-    "Hide previous solutions and improve problem-solving discipline.",
+    "Locks LeetCode solutions behind a think-time timer, tracks how you solve, and schedules blind re-solves so patterns stick.",
 
   permissions: [
     // settings, per-problem timers and practice history
